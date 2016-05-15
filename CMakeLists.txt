@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
+project(terrariashot)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(SOURCE_FILES terrariashot.c)
+add_executable(terrariashot ${SOURCE_FILES})
