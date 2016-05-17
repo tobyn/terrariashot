@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
 
     int zoom = argc == 7 ? atoi(argv[6]) : 1;
     if (zoom < 1 || zoom > 5)
-        die("Invalid zoom level: %d", zoom);
+        die("Invalid zoom level (1 <= %d <= 5)", zoom);
 
     open_world();
 
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     int max_y = *blocks_tall / 2;
 
     int max_width = max_x - capture_left;
-    int max_height = max_y - capture_height;
+    int max_height = max_y - capture_top;
 
     if (capture_left < -max_x || capture_left >= max_x)
         die("Invalid capture area (left = %d <= %d < %d)",
@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
         die("Invalid capture area (height = %d < %d < %d)",
             0, capture_height, max_height);
 
-    int scale = 2 ^ (5 - zoom);
+    int scale = 1 << (5 - zoom);
     printf("Capturing %dx%d blocks (%d), %dx%d pixels (%d)\n",
            capture_width, capture_height, capture_width * capture_height,
            capture_width * scale, capture_height * scale, capture_width * capture_height * scale);
