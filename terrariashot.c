@@ -16,9 +16,9 @@ uint8_t *world;
 char *world_path;
 int world_fd;
 size_t world_file_size;
-int32_t *world_version;
+int32_t world_version;
 
-int16_t *section_count;
+int16_t section_count;
 int32_t *section_offsets;
 
 void die(const char *format, ...) {
@@ -70,28 +70,28 @@ void open_world(void) {
     if (world == MAP_FAILED)
         die_perror("Couldn't mmap world file");
 
-    world_version = (int32_t *) world;
-    if (*world_version < 0 || *world_version > MAX_SUPPORTED_MAP_VERSION)
-        die("Unsupported world version: %d", *world_version);
+    world_version = *(int32_t *) world;
+    if (world_version < 0 || world_version > MAX_SUPPORTED_MAP_VERSION)
+        die("Unsupported world version: %d", world_version);
 
     int section_list_offset = 16;
 
-    if (*world_version >= 135) {
-        if (memcmp("relogic", world_version + 1, 7) != 0)
+    if (world_version >= 135) {
+        if (memcmp("relogic", world + 4, 7) != 0)
             die_invalid("Bad magic");
 
-        uint8_t *file_type = world + 11;
-        if (*file_type != 2)
+        uint8_t file_type = world[11];
+        if (file_type != 2)
             die("Not a world file (file type %u)", file_type);
 
         section_list_offset += 8;
     }
 
-    section_count = (int16_t *) (world + section_list_offset);
-    if (*section_count < 1)
+    section_count = *(int16_t *) (world + section_list_offset);
+    if (section_count < 1)
         die_invalid("Invalid section list");
 
-    section_offsets = (int32_t *) (section_count + 1);
+    section_offsets = (int32_t *) (world + section_list_offset + 2);
 }
 
 void close_world(void) {
@@ -164,7 +164,52 @@ int main(int argc, char *argv[]) {
     int scale = 1 << (5 - zoom);
     printf("Capturing %dx%d blocks (%d), %dx%d pixels (%d)\n",
            capture_width, capture_height, capture_width * capture_height,
-           capture_width * scale, capture_height * scale, capture_width * capture_height * scale);
+           capture_width * scale, capture_height * scale,
+           capture_width * capture_height * scale);
+
+    uint8_t *tiles = world + section_offsets[1];
+    uint8_t *tile = tiles;
+
+    for (int x = -max_x; x < max_x; x++) {
+        for (int y = -max_y; y < max_y; y++) {
+            uint8_t flags1 = *tile++;
+            uint8_t flags2 = 0;
+            uint8_t flags3 = 0;
+
+            int has_flags2 = flags1 & 1;
+            if (has_flags2)
+                flags2 = *tile++;
+
+            int has_flags3 = flags2 & 1;
+            if (has_flags3)
+                flags3 = *tile++;
+
+            printf("%d, %d\n", x, y);
+            printf("  Flags 1: %d\n", flags1);
+
+            if (has_flags2)
+                printf("  Flags 2: %d\n", flags2);
+
+            if (has_flags3)
+                printf("  Flags 3: %d\n", flags3);
+
+            int active = (flags1 & 2) >> 1;
+            printf("  Active? %d\n", active);
+
+            if (active) {
+                int type = *tile++;
+                if (flags1 & 0x20)
+                    type |= *tile++ << 8;
+
+                printf("  Type: %d\n", type);
+            }
+
+            if (y > -max_y)
+                goto done;
+        }
+    }
+
+    done:
 
     close_world();
 
