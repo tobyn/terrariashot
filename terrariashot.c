@@ -169,121 +169,101 @@ int main(int argc, char *argv[]) {
     uint8_t *tiles = world + section_offsets[1];
     uint8_t *tile = tiles;
 
-    for (int x = -max_x; x < max_x; x++) {
-        for (int y = -max_y; y < max_y; y++) {
-            int capturing = x >= capture_left &&
-                            x < capture_left + capture_width &&
-                            y >= capture_top &&
-                            y < capture_top + capture_height;
+    int x = -max_x, y = -max_x;
+    int right = capture_left + capture_width;
+    int bottom = capture_top + capture_height;
 
-            uint8_t flags1 = *tile++;
-            uint8_t flags2 = 0;
-            uint8_t flags3 = 0;
+    int capturing = x >= capture_left &&
+                    x < right &&
+                    y >= capture_top &&
+                    y < bottom;
+    int captured = 0;
+    while (1) {
+        if (x >= right && y >= bottom)
+            break;
 
-            int has_flags2 = flags1 & 1;
-            if (has_flags2)
-                flags2 = *tile++;
+        uint8_t flags1 = *tile++;
+        uint8_t flags2 = 0;
+        uint8_t flags3 = 0;
 
-            int has_flags3 = flags2 & 1;
-            if (has_flags3)
-                flags3 = *tile++;
+        int has_flags2 = flags1 & 1;
+        if (has_flags2)
+            flags2 = *tile++;
 
-            int active = (flags1 & 2) >> 1;
+        int has_flags3 = flags2 & 1;
+        if (has_flags3)
+            flags3 = *tile++;
 
-            if (capturing) {
-                printf("%d, %d\n", x, y);
-                printf("  Flags 1: %d\n", flags1);
+        int active = (flags1 & 2) >> 1;
+        if (active) {
+            int type = *tile++;
 
-                if (has_flags2)
-                    printf("  Flags 2: %d\n", flags2);
+            if (flags1 & 0x20)
+                tile++; // type |= *tile++ << 8;
 
-                if (has_flags3)
-                    printf("  Flags 3: %d\n", flags3);
-
-                printf("  Active? %d\n", active);
+            if (extra[type]) {
+                tile += 2; // u
+                tile += 2; // v
             }
 
-            if (active) {
-                int type = *tile++;
-                if (flags1 & 0x20)
-                    type |= *tile++ << 8;
+            if (flags3 & 0x8)
+                tile++; // color
+        }
 
-                if (capturing)
-                    printf("  Type: %d\n", type);
+        if (flags1 & 4) {
+            tile++; // wall
 
-                int16_t u = -1;
-                int16_t v = -1;
+            if (flags3 & 0x10)
+                tile++; // wall color
+        }
 
-                if (extra[type]) {
-                    u = *(int16_t *) tile;
-                    tile += 2;
+        if (flags1 & 0x18)
+            tile++; // liquid
 
-                    v = *(int16_t *) tile;
-                    tile += 2;
-                }
+        y++;
 
-                if (capturing && (u != 0 || v != 0))
-                    printf("  U: %d, V: %d\n", u, v);
+        if (y == max_y) {
+            y = -max_y;
+            x++;
+        }
 
-                if (flags3 & 0x8) {
-                    uint8_t color = *tile++;
+        capturing = x >= capture_left &&
+                    x < right &&
+                    y >= capture_top &&
+                    y < bottom;
 
-                    if (capturing)
-                        printf("  Color: %d\n", color);
-                }
+        if (capturing)
+            captured++;
+
+        int rle = 0;
+        int rle_format = flags1 >> 6;
+        if (rle_format == 1) {
+            rle = *tile++;
+        } else if (rle_format == 2) {
+            rle = *(int16_t *) tile;
+            tile += 2;
+        }
+
+        while (rle-- > 0) {
+            y++;
+
+            if (y >= max_y) {
+                y = -max_y;
+                x++;
             }
 
-            if (flags1 & 4) {
-                uint8_t wall = *tile++;
+            capturing = x >= capture_left &&
+                        x < right &&
+                        y >= capture_top &&
+                        y < bottom;
 
-                if (capturing)
-                    printf("  Wall: %d\n", wall);
-
-                if (flags3 & 0x10) {
-                    uint8_t wall_color = *tile++;
-
-                    if (capturing)
-                        printf("  Wall color: %d\n", wall_color);
-                }
-            }
-
-            if (flags1 & 0x18) {
-                int liquid = *tile++;
-
-                if (capturing) {
-                    printf("  Liquid: %d", liquid);
-
-                    int liquid_type = flags1 & 0x18;
-                    if (liquid_type == 0x10)
-                        puts(" (Lava)");
-                    else if (liquid_type == 0x18)
-                        puts(" (Honey)");
-                    else
-                        printf(" (Unknown type: %d)\n", liquid_type);
-                }
-            }
-
-            int rle = 0;
-            int rle_format = flags1 >> 6;
-            if (rle_format == 1) {
-                rle = *tile++;
-            } else if (rle_format == 2) {
-                rle = *(int16_t *) tile;
-                tile += 2;
-            }
-
-            if (rle > 0) {
-                if (capturing)
-                    printf("  RLE: %d\n", rle);
-
-                y += rle;
-                while (y >= max_y) {
-                    x++;
-                    y -= blocks_tall;
-                }
-            }
+            if (capturing)
+                captured++;
         }
     }
+
+    printf("Read %d tiles (%d * %d)\n", captured, capture_width, capture_height);
+    printf("Total bytes read: %lu\n", tile - tiles);
 
     close_world();
 
