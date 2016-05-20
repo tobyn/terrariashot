@@ -11,9 +11,9 @@ typedef struct _TerrariaWorld {
     uint8_t *start, *extra, *info, *tiles;
 } TerrariaWorld;
 
-TerrariaWorld *terraria_open_world(const char *world_path, TerrariaError *error);
+TerrariaWorld *terraria_open_world(const char *world_path, TerrariaError **error);
 void terraria_close_world(TerrariaWorld *world);
 
-int terraria_get_world_size(const TerrariaWorld *world, int *width, int *height, TerrariaError *error);
+int terraria_get_world_size(const TerrariaWorld *world, int *width, int *height, TerrariaError **error);
 
 #endif // WORLD_H

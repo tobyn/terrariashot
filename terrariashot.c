@@ -1,19 +1,12 @@
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 
 #include "world.h"
 
-void die(const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-
-    vfprintf(stderr, format, args);
+void die(const char *message) {
+    fputs(message, stderr);
     fputs("\n", stderr);
-
-    va_end(args);
-
     exit(EXIT_FAILURE);
 }
 
@@ -43,16 +36,16 @@ int main(int argc, char *argv[]) {
 
     int zoom = argc == 7 ? atoi(argv[6]) : 1;
     if (zoom < 1 || zoom > 5)
-        die("Invalid zoom level (1 <= %d <= 5)", zoom);
+        die(_terraria_make_errorf("Invalid zoom level (1 <= %d <= 5)", zoom));
 
     TerrariaError *error = NULL;
-    TerrariaWorld *world = terraria_open_world(world_path, error);
+    TerrariaWorld *world = terraria_open_world(world_path, &error);
     if (world == NULL)
-        die("Couldn't open world: %s", error);
+        die(error);
 
     int blocks_wide, blocks_tall;
-    if (!terraria_get_world_size(world, &blocks_wide, &blocks_tall, error))
-        die("Couldn't get world size: %s", error);
+    if (!terraria_get_world_size(world, &blocks_wide, &blocks_tall, &error))
+        die(error);
 
     int max_x = blocks_wide / 2;
     int max_y = blocks_tall / 2;
@@ -61,20 +54,21 @@ int main(int argc, char *argv[]) {
     int max_height = max_y - capture_top;
 
     if (capture_left < -max_x || capture_left >= max_x)
-        die("Invalid capture area (left = %d <= %d < %d)",
-            -max_x, capture_left, max_x);
+        die(_terraria_make_errorf("Invalid capture area (left = %d <= %d < %d)",
+                                  -max_x, capture_left, max_x));
 
     if (capture_width < 1 || capture_width > max_width)
-        die("Invalid capture area (width = %d < %d < %d)",
-            0, capture_width, max_width);
+        die(_terraria_make_errorf("Invalid capture area (width = %d < %d < %d)",
+                                  0, capture_width, max_width));
 
     if (capture_top < -max_y || capture_top >= max_y)
-        die("Invalid capture area (top = %d <= %d < %d)",
-            -max_y, capture_top, max_y);
+        die(_terraria_make_errorf("Invalid capture area (top = %d <= %d < %d)",
+                                  -max_y, capture_top, max_y));
 
     if (capture_height < 1 || capture_height > max_height)
-        die("Invalid capture area (height = %d < %d < %d)",
-            0, capture_height, max_height);
+        die(_terraria_make_errorf(
+                "Invalid capture area (height = %d < %d < %d)",
+                0, capture_height, max_height));
 
     int scale = 1 << (5 - zoom);
     printf("Capturing %dx%d blocks (%d), %dx%d pixels (%d)\n",
@@ -159,7 +153,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("Read %d tiles (%d * %d)\n", captured, capture_width, capture_height);
+    printf("Read %d tiles (%d * %d)\n", captured, capture_width,
+           capture_height);
     printf("Total bytes read: %lu\n", tile - tiles);
 
     terraria_close_world(world);

@@ -7,7 +7,7 @@
 
 #define TERRARIA_ERROR_DEFAULT_BUFFER_SIZE 1024
 
-TerrariaError *MALLOC_FAILED = (TerrariaError *) "Memory allocation failed";
+TerrariaError *MALLOC_FAILED = "Memory allocation failed";
 
 TerrariaError *_terraria_make_error(const char *message) {
     size_t message_length = strlen(message);
@@ -43,18 +43,9 @@ TerrariaError *_terraria_make_errorf(const char *format, ...) {
 
     va_end(args);
 
-    return (TerrariaError *) error;
+    return error;
 }
 
 TerrariaError *_terraria_make_perror(const char *message) {
     return _terraria_make_errorf("%s (%s)", message, strerror(errno));
-}
-
-TerrariaError *_terraria_make_strerror() {
-    return _terraria_make_error(strerror(errno));
-}
-
-void terraria_free_error(TerrariaError *error) {
-    if (error != MALLOC_FAILED)
-        free(error);
 }
