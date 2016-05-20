@@ -10,9 +10,9 @@
 
 #define MAX_SUPPORTED_MAP_VERSION 156
 
-TerrariaWorld *terraria_open_world(const char *world_path,
-                                   TerrariaError *error) {
-
+TerrariaWorld *terraria_open_world(
+        const char *world_path,
+        __attribute__((unused)) TerrariaError *error) {
     TerrariaWorld *world = malloc(sizeof(TerrariaWorld));
 
     world->fd = open(world_path, O_RDONLY);
@@ -30,7 +30,7 @@ TerrariaWorld *terraria_open_world(const char *world_path,
     world->file_size = (size_t) world_file_stats.st_size;
 
     world->start = mmap(NULL, world->file_size, PROT_READ, MAP_SHARED,
-                           world->fd, 0);
+                        world->fd, 0);
     if (world->start == MAP_FAILED) {
         error = _terraria_make_perror("Failed to mmap world file");
         goto fail;
@@ -71,6 +71,9 @@ TerrariaWorld *terraria_open_world(const char *world_path,
     world->sections = (int32_t *) (world->start + section_list_offset + 2);
     world->extra = world->start + section_list_offset + 8;
 
+    world->info = world->start + world->sections[0];
+    world->tiles = world->start + world->sections[1];
+
     return world;
 
     fail:
@@ -87,11 +90,18 @@ void terraria_close_world(TerrariaWorld *world) {
 }
 
 
-int terraria_get_world_size(const TerrariaWorld *world, int *width, int *height,
-                            TerrariaError *error) {
-    uint8_t *header = world->start + world->sections[0];
-    uint8_t *title_length = header;
+int terraria_get_world_size(
+        const TerrariaWorld *world,
+        __attribute__((unused)) int *width,
+        __attribute__((unused)) int *height,
+        __attribute__((unused)) TerrariaError *error) {
+    uint8_t *world_info = world->start + world->sections[0];
+    uint8_t title_length = *world_info;
 
-    height = (int32_t *) (header + *title_length + 21);
-    width = (int32_t *) (header + *title_length + 25);
+    int32_t *world_size = (int32_t *) (world_info + title_length + 21);
+
+    *height = *world_size++;
+    *width = *world_size;
+
+    return 1;
 }

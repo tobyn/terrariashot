@@ -8,7 +8,7 @@ typedef struct _TerrariaWorld {
     size_t file_size;
     int section_count;
     int32_t *sections;
-    uint8_t *start, *extra, *tiles;
+    uint8_t *start, *extra, *info, *tiles;
 } TerrariaWorld;
 
 TerrariaWorld *terraria_open_world(const char *world_path, TerrariaError *error);
