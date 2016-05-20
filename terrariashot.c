@@ -170,18 +170,11 @@ int main(int argc, char *argv[]) {
     uint8_t *tile = tiles;
 
     int x = -max_x, y = -max_x;
-    int right = capture_left + capture_width;
-    int bottom = capture_top + capture_height;
-
-    int capturing = x >= capture_left &&
-                    x < right &&
-                    y >= capture_top &&
-                    y < bottom;
+    int capture_right = capture_left + capture_width;
+    int capture_bottom = capture_top + capture_height;
     int captured = 0;
-    while (1) {
-        if (x >= right && y >= bottom)
-            break;
-
+    int parsing = 1;
+    while (parsing) {
         uint8_t flags1 = *tile++;
         uint8_t flags2 = 0;
         uint8_t flags3 = 0;
@@ -220,21 +213,6 @@ int main(int argc, char *argv[]) {
         if (flags1 & 0x18)
             tile++; // liquid
 
-        y++;
-
-        if (y == max_y) {
-            y = -max_y;
-            x++;
-        }
-
-        capturing = x >= capture_left &&
-                    x < right &&
-                    y >= capture_top &&
-                    y < bottom;
-
-        if (capturing)
-            captured++;
-
         int rle = 0;
         int rle_format = flags1 >> 6;
         if (rle_format == 1) {
@@ -244,7 +222,13 @@ int main(int argc, char *argv[]) {
             tile += 2;
         }
 
-        while (rle-- > 0) {
+        while (rle-- >= 0) {
+            if (x >= capture_left &&
+                x < capture_right &&
+                y >= capture_top &&
+                y < capture_bottom)
+                captured++;
+
             y++;
 
             if (y >= max_y) {
@@ -252,13 +236,10 @@ int main(int argc, char *argv[]) {
                 x++;
             }
 
-            capturing = x >= capture_left &&
-                        x < right &&
-                        y >= capture_top &&
-                        y < bottom;
-
-            if (capturing)
-                captured++;
+            if (x >= capture_right && y >= capture_bottom) {
+                parsing = 0;
+                break;
+            }
         }
     }
 
