@@ -1,26 +1,9 @@
-#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
-#define MAX_SUPPORTED_MAP_VERSION 156
-
-char *cmd;
-
-uint8_t *world;
-char *world_path;
-int world_fd;
-size_t world_file_size;
-int32_t world_version;
-
-int16_t section_count;
-int32_t *section_offsets;
-uint8_t *extra;
+#include "world.h"
 
 void die(const char *format, ...) {
     va_list args;
@@ -34,7 +17,7 @@ void die(const char *format, ...) {
     exit(EXIT_FAILURE);
 }
 
-void die_usage() {
+void die_usage(const char *cmd) {
     fprintf(stderr,
             "Usage: %s <world> <left> <top> <width> <height> [zoom]\n",
             cmd);
@@ -47,77 +30,11 @@ void die_usage() {
     exit(EXIT_FAILURE);
 }
 
-void die_invalid(const char *reason) {
-    die("Invalid world file (%s)", reason);
-}
-
-void die_perror(const char *message) {
-    perror(message);
-    exit(EXIT_FAILURE);
-}
-
-void open_world(void) {
-    world_fd = open(world_path, O_RDONLY);
-    if (world_fd == -1)
-        die_perror("Couldn't open world file");
-
-    struct stat world_file_stats;
-    if (fstat(world_fd, &world_file_stats) == -1)
-        die_perror("Couldn't read world file stats");
-
-    world_file_size = (size_t) world_file_stats.st_size;
-
-    world = mmap(NULL, world_file_size, PROT_READ, MAP_SHARED, world_fd, 0);
-    if (world == MAP_FAILED)
-        die_perror("Couldn't mmap world file");
-
-    world_version = *(int32_t *) world;
-    if (world_version < 0 || world_version > MAX_SUPPORTED_MAP_VERSION)
-        die("Unsupported world version: %d", world_version);
-
-    int section_list_offset = 16;
-
-    if (world_version >= 135) {
-        if (memcmp("relogic", world + 4, 7) != 0)
-            die_invalid("Bad magic");
-
-        uint8_t file_type = world[11];
-        if (file_type != 2)
-            die("Not a world file (file type %u)", file_type);
-
-        section_list_offset += 8;
-    }
-
-    section_count = *(int16_t *) (world + section_list_offset);
-    if (section_count < 1)
-        die_invalid("Invalid section list");
-
-    section_offsets = (int32_t *) (world + section_list_offset + 2);
-    extra = world + section_list_offset + 8;
-}
-
-void close_world(void) {
-    munmap(world, world_file_size);
-    close(world_fd);
-}
-
 int main(int argc, char *argv[]) {
-    // allocate output message (width / scale * height / scale)
-    // open world file
-    // until past last block of capture region (or eof)
-    //   read to top left of capture region
-    //   encode block pixels to output message
-    //   move to next block
-    // close world file
-    // encode output message
-    // write output file
-
-    cmd = argv[0];
-
     if (argc < 6 || argc > 7)
-        die_usage();
+        die_usage(argv[0]);
 
-    world_path = argv[1];
+    char *world_path = argv[1];
 
     int capture_left = atoi(argv[2]);
     int capture_top = atoi(argv[3]);
@@ -128,15 +45,14 @@ int main(int argc, char *argv[]) {
     if (zoom < 1 || zoom > 5)
         die("Invalid zoom level (1 <= %d <= 5)", zoom);
 
-    open_world();
+    TerrariaError *error = NULL;
+    TerrariaWorld *world = terraria_open_world(world_path, error);
+    if (world == NULL)
+        die("Couldn't open world: %s", error);
 
-    int32_t *header_offset = section_offsets;
-    uint8_t *header = world + *header_offset;
-
-    uint8_t *title_length = header;
-
-    int32_t blocks_tall = *(int32_t *) (header + *title_length + 21);
-    int32_t blocks_wide = *(int32_t *) (header + *title_length + 25);
+    int blocks_wide, blocks_tall;
+    if (!terraria_get_world_size(world, &blocks_wide, &blocks_tall, error))
+        die("Couldn't get world size: %s", error);
 
     int max_x = blocks_wide / 2;
     int max_y = blocks_tall / 2;
@@ -166,7 +82,7 @@ int main(int argc, char *argv[]) {
            capture_width * scale, capture_height * scale,
            capture_width * capture_height * scale);
 
-    uint8_t *tiles = world + section_offsets[1];
+    uint8_t *tiles = world->tiles;
     uint8_t *tile = tiles;
 
     int x = -max_x, y = -max_x;
@@ -194,7 +110,7 @@ int main(int argc, char *argv[]) {
             if (flags1 & 0x20)
                 tile++; // type |= *tile++ << 8;
 
-            if (extra[type]) {
+            if (world->extra[type]) {
                 tile += 2; // u
                 tile += 2; // v
             }
@@ -246,7 +162,7 @@ int main(int argc, char *argv[]) {
     printf("Read %d tiles (%d * %d)\n", captured, capture_width, capture_height);
     printf("Total bytes read: %lu\n", tile - tiles);
 
-    close_world();
+    terraria_close_world(world);
 
     return EXIT_SUCCESS;
 }
