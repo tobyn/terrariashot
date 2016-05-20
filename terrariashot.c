@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
                 x++;
             }
 
-            if (x >= capture_right && y >= capture_bottom) {
+            if (x + 1 == capture_right && y + 1 == capture_bottom) {
                 parsing = 0;
                 break;
             }
