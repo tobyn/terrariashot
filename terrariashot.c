@@ -54,16 +54,19 @@ int main(int argc, char *argv[]) {
     int max_height = max_y - capture_top;
 
     if (capture_left < -max_x || capture_left >= max_x)
-        die(_terraria_make_errorf("Invalid capture area (left = %d <= %d < %d)",
-                                  -max_x, capture_left, max_x));
+        die(_terraria_make_errorf(
+                "Invalid capture area (left = %d <= %d < %d)",
+                -max_x, capture_left, max_x));
 
     if (capture_width < 1 || capture_width > max_width)
-        die(_terraria_make_errorf("Invalid capture area (width = %d < %d < %d)",
-                                  0, capture_width, max_width));
+        die(_terraria_make_errorf(
+                "Invalid capture area (width = %d < %d < %d)",
+                0, capture_width, max_width));
 
     if (capture_top < -max_y || capture_top >= max_y)
-        die(_terraria_make_errorf("Invalid capture area (top = %d <= %d < %d)",
-                                  -max_y, capture_top, max_y));
+        die(_terraria_make_errorf(
+                "Invalid capture area (top = %d <= %d < %d)",
+                -max_y, capture_top, max_y));
 
     if (capture_height < 1 || capture_height > max_height)
         die(_terraria_make_errorf(

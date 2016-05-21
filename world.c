@@ -8,7 +8,8 @@
 
 #include "world.h"
 
-#define MAX_SUPPORTED_MAP_VERSION 156
+#define MAX_SUPPORTED_WORLD_VERSION 156
+#define MIN_SUPPORTED_WORLD_VERSION 88
 
 TerrariaWorld *terraria_open_world(
         const char *world_path,
@@ -41,9 +42,16 @@ TerrariaWorld *terraria_open_world(
     }
 
     int world_version = *(int32_t *) world->start;
-    if (world_version < 0 || world_version > MAX_SUPPORTED_MAP_VERSION) {
-        *error = _terraria_make_errorf("Unsupported world version: %d",
-                                       world_version);
+    if (world_version < MIN_SUPPORTED_WORLD_VERSION) {
+        *error = _terraria_make_errorf(
+                "World too old (version %d < %d)",
+                world_version, MIN_SUPPORTED_WORLD_VERSION);
+        goto clean_up_mmap;
+    }
+    if (world_version > MAX_SUPPORTED_WORLD_VERSION) {
+        *error = _terraria_make_errorf(
+                "World too new (version %d > %d)",
+                world_version, MAX_SUPPORTED_WORLD_VERSION);
         goto clean_up_mmap;
     }
 
