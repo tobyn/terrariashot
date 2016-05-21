@@ -142,16 +142,16 @@ int main(int argc, char *argv[]) {
                 y < capture_bottom)
                 captured++;
 
+            if (x + 1 == capture_right && y + 1 == capture_bottom) {
+                parsing = 0;
+                break;
+            }
+
             y++;
 
             if (y >= max_y) {
                 y = -max_y;
                 x++;
-            }
-
-            if (x + 1 == capture_right && y + 1 == capture_bottom) {
-                parsing = 0;
-                break;
             }
         }
     }
