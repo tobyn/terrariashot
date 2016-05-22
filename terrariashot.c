@@ -43,13 +43,12 @@ int main(int argc, char *argv[]) {
     if (world == NULL)
         die(error);
 
-    int blocks_wide, blocks_tall;
+    unsigned int blocks_wide, blocks_tall;
     if (!terraria_get_world_size(world, &blocks_wide, &blocks_tall, &error))
         die(error);
 
     int max_x = blocks_wide / 2;
     int max_y = blocks_tall / 2;
-
     int max_width = max_x - capture_left;
     int max_height = max_y - capture_top;
 
@@ -79,84 +78,28 @@ int main(int argc, char *argv[]) {
            capture_width * scale, capture_height * scale,
            capture_width * capture_height * scale);
 
-    uint8_t *tiles = world->tiles;
-    uint8_t *tile = tiles;
+    unsigned int offset = (capture_left * blocks_tall) + capture_top;
+    unsigned int end_offset = (capture_left + capture_width - 1) * blocks_tall +
+                     capture_top + capture_height;
 
-    int x = -max_x, y = -max_x;
-    int capture_right = capture_left + capture_width - 1;
-    int capture_bottom = capture_top + capture_height - 1;
-    int capturing = 0, captured = 0;
-    while (capturing != -1) {
-        uint8_t flags1 = *tile++;
-        uint8_t flags2 = 0;
-        uint8_t flags3 = 0;
+    TerrariaTileCursor cursor;
+    if (!terraria_seek_tile(world, offset, &cursor, &error))
+        die(error);
 
-        int has_flags2 = flags1 & 1;
-        if (has_flags2)
-            flags2 = *tile++;
+    int captured = 0;
+    uint8_t *tiles = cursor.tile;
+    uint8_t *tile;
+    while (1) {
+        captured++;
+        tile = cursor.tile;
 
-        int has_flags3 = flags2 & 1;
-        if (has_flags3)
-            flags3 = *tile++;
+        offset++;
 
-        int active = (flags1 >> 1) & 1;
-        if (active) {
-            int type = *tile++;
+        if (offset == end_offset)
+            break;
 
-            if (flags1 & 0x20)
-                tile++; // type |= *tile++ << 8;
-
-            if (world->extra[type]) {
-                tile += 2; // u
-                tile += 2; // v
-            }
-
-            if (flags3 & 0x8)
-                tile++; // color
-        }
-
-        if (flags1 & 4) {
-            tile++; // wall
-
-            if (flags3 & 0x10)
-                tile++; // wall color
-        }
-
-        if (flags1 & 0x18)
-            tile++; // liquid
-
-        int rle = 0;
-        int rle_format = flags1 >> 6;
-        if (rle_format == 1) {
-            rle = *tile++;
-        } else if (rle_format == 2) {
-            rle = *(int16_t *) tile;
-            tile += 2;
-        }
-
-        while (rle-- >= 0) {
-            if (y == capture_top && x >= capture_left)
-                capturing = 1;
-
-            if (capturing)
-                captured++;
-
-            if (y == capture_bottom) {
-                if (x == capture_right) {
-                    capturing = -1;
-                    break;
-                } else {
-                    capturing = 0;
-                }
-            }
-
-            y++;
-
-            if (y >= max_y) {
-                y = -max_y;
-                x++;
-            }
-        }
+        if (!terraria_seek_next_tile(&cursor, &error))
+            die(error);
     }
 
     printf("Read %d tiles (%d * %d)\n", captured, capture_width,
