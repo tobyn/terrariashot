@@ -83,11 +83,10 @@ int main(int argc, char *argv[]) {
     uint8_t *tile = tiles;
 
     int x = -max_x, y = -max_x;
-    int capture_right = capture_left + capture_width;
-    int capture_bottom = capture_top + capture_height;
-    int captured = 0;
-    int parsing = 1;
-    while (parsing) {
+    int capture_right = capture_left + capture_width - 1;
+    int capture_bottom = capture_top + capture_height - 1;
+    int capturing = 0, captured = 0;
+    while (capturing != -1) {
         uint8_t flags1 = *tile++;
         uint8_t flags2 = 0;
         uint8_t flags3 = 0;
@@ -100,7 +99,7 @@ int main(int argc, char *argv[]) {
         if (has_flags3)
             flags3 = *tile++;
 
-        int active = (flags1 & 2) >> 1;
+        int active = (flags1 >> 1) & 1;
         if (active) {
             int type = *tile++;
 
@@ -136,15 +135,19 @@ int main(int argc, char *argv[]) {
         }
 
         while (rle-- >= 0) {
-            if (x >= capture_left &&
-                x < capture_right &&
-                y >= capture_top &&
-                y < capture_bottom)
+            if (y == capture_top && x >= capture_left)
+                capturing = 1;
+
+            if (capturing)
                 captured++;
 
-            if (x + 1 == capture_right && y + 1 == capture_bottom) {
-                parsing = 0;
-                break;
+            if (y == capture_bottom) {
+                if (x == capture_right) {
+                    capturing = -1;
+                    break;
+                } else {
+                    capturing = 0;
+                }
             }
 
             y++;
