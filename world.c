@@ -1,6 +1,5 @@
 #include <fcntl.h>
 #include <memory.h>
-#include <stdint.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -16,13 +15,6 @@ static uint8_t *get_bytes(
         const unsigned int offset,
         const unsigned int size,
         TerrariaError **error) {
-    if (offset < 0) {
-        *error = _terraria_make_errorf(
-                "Negative file offset requested (%d < 0)",
-                offset);
-        return NULL;
-    }
-
     if (offset + size > world->file_size) {
         *error = _terraria_make_errorf(
                 "World file ended prematurely (Expected at least %d bytes, got %d)",
@@ -48,23 +40,12 @@ static unsigned int get_section_offset(
     int signed_offset = world->sections[section];
     if (signed_offset < 0) {
         *error = _terraria_make_error(
-                "Invalid world file (Negative section offset)");
+                "Invalid world file (Negative section file_offset)");
         return 0;
     }
 
     *offset = (unsigned int) signed_offset;
     return 1;
-}
-
-static uint8_t *get_section(
-        const TerrariaWorld *world,
-        const unsigned int section,
-        TerrariaError **error) {
-    unsigned int offset;
-    if (!get_section_offset(world, section, &offset, error))
-        return NULL;
-
-    return world->start + offset;
 }
 
 static uint8_t *get_extra(
@@ -247,112 +228,137 @@ int terraria_get_world_size(
     return 1;
 }
 
-int terraria_seek_tile(
-        const TerrariaWorld *world,
-        const unsigned int offset,
-        TerrariaTileCursor *cursor,
-        TerrariaError **error) {
-    unsigned int position;
-    if (!get_section_offset(world, 1, &position, error))
+static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
+    uint8_t *bytes;
+
+    unsigned int position = cursor->file_offset;
+    bytes = get_bytes(cursor->world, position++, 1, error);
+    if (bytes == NULL)
         return 0;
 
-    uint8_t *bytes;
-    unsigned int index = 0;
-    while (index <= offset) {
-        bytes = get_bytes(world, position++, 1, error);
+    uint8_t flags1 = *bytes;
+    uint8_t flags2 = 0;
+    uint8_t flags3 = 0;
+
+    int has_flags2 = flags1 & 1;
+    if (has_flags2) {
+        bytes = get_bytes(cursor->world, position++, 1, error);
         if (bytes == NULL)
             return 0;
 
-        uint8_t flags1 = *bytes;
-        uint8_t flags2 = 0;
-        uint8_t flags3 = 0;
-
-        int has_flags2 = flags1 & 1;
-        if (has_flags2) {
-            bytes = get_bytes(world, position++, 1, error);
-            if (bytes == NULL)
-                return 0;
-
-            flags2 = *bytes;
-        }
-
-        int has_flags3 = flags2 & 1;
-        if (has_flags3) {
-            bytes = get_bytes(world, position++, 1, error);
-            if (bytes == NULL)
-                return 0;
-
-            flags3 = *bytes;
-        }
-
-        int active = (flags1 >> 1) & 1;
-        if (active) {
-            bytes = get_bytes(world, position++, 1, error);
-            if (bytes == NULL)
-                return 0;
-
-            unsigned int type = *bytes;
-
-            if (flags1 & 0x20) {
-                bytes = get_bytes(world, position++, 1, error);
-                if (bytes == NULL)
-                    return 0;
-
-                type |= *bytes << 8;
-            }
-
-            bytes = get_extra(world, type, error);
-            if (bytes == NULL)
-                return 0;
-
-            if (*bytes)
-                position += 4; // skip u and v (int16)
-
-            if (flags3 & 0x8)
-                position++; // color
-        }
-
-        if (flags1 & 4) {
-            position++; // wall
-
-            if (flags3 & 0x10)
-                position++; // wall color
-        }
-
-        if (flags1 & 0x18)
-            position++; // liquid
-
-        int rle = 0;
-        int rle_format = flags1 >> 6;
-        if (rle_format == 1) {
-            bytes = get_bytes(world, position++, 1, error);
-            if (bytes == NULL)
-                return 0;
-
-            rle = *bytes;
-        } else if (rle_format == 2) {
-            bytes = get_bytes(world, position, 2, error);
-            if (bytes == NULL)
-                return 0;
-
-            position += 2;
-            rle = *(int16_t *) bytes;
-        }
-
-        if (rle < 0) {
-            *error = _terraria_make_error("Invalid map file (Negative RLE)");
-            return 0;
-        }
-
-        index += rle;
+        flags2 = *bytes;
     }
 
-    cursor->tile = bytes;
-    cursor->size =
+    int has_flags3 = flags2 & 1;
+    if (has_flags3) {
+        bytes = get_bytes(cursor->world, position++, 1, error);
+        if (bytes == NULL)
+            return 0;
+
+        flags3 = *bytes;
+    }
+
+    int active = (flags1 >> 1) & 1;
+    if (active) {
+        bytes = get_bytes(cursor->world, position++, 1, error);
+        if (bytes == NULL)
+            return 0;
+
+        unsigned int type = *bytes;
+
+        if (flags1 & 0x20) {
+            bytes = get_bytes(cursor->world, position++, 1, error);
+            if (bytes == NULL)
+                return 0;
+
+            type |= *bytes << 8;
+        }
+
+        bytes = get_extra(cursor->world, type, error);
+        if (bytes == NULL)
+            return 0;
+
+        if (*bytes)
+            position += 4; // skip u and v (int16)
+
+        if (flags3 & 0x8)
+            position++; // color
+    }
+
+    if (flags1 & 4) {
+        position++; // wall
+
+        if (flags3 & 0x10)
+            position++; // wall color
+    }
+
+    if (flags1 & 0x18)
+        position++; // liquid
+
+    int rle = 0;
+    int rle_format = flags1 >> 6;
+    if (rle_format == 1) {
+        bytes = get_bytes(cursor->world, position++, 1, error);
+        if (bytes == NULL)
+            return 0;
+
+        rle = *bytes;
+    } else if (rle_format == 2) {
+        bytes = get_bytes(cursor->world, position, 2, error);
+        if (bytes == NULL)
+            return 0;
+
+        position += 2;
+        rle = *(int16_t *) bytes;
+    }
+
+    if (rle < 0) {
+        *error = _terraria_make_error("Invalid map file (Negative RLE)");
+        return 0;
+    }
+
+    cursor->tile.rle = (unsigned int) rle;
+    cursor->tile.size = position - cursor->file_offset;
+
+    return 1;
 }
 
-int terraria_seek_next_tile(
+int terraria_seek_tile(
+        const TerrariaWorld *world,
+        const unsigned int tile_offset,
         TerrariaTileCursor *cursor,
         TerrariaError **error) {
+    unsigned int file_offset;
+    if (!get_section_offset(world, 1, &file_offset, error))
+        return 0;
 
+    cursor->world = world;
+    cursor->file_offset = file_offset;
+
+    unsigned int tile_index = 0;
+    while (1) {
+        if (!read_tile(cursor, error))
+            return 0;
+
+        unsigned int last_index = tile_index + cursor->tile.rle;
+        if (last_index >= tile_offset) {
+            cursor->rle_offset = tile_offset - tile_index;
+            return 1;
+        } else {
+            tile_index += 1 + cursor->tile.rle;
+            cursor->file_offset += cursor->tile.size;
+        }
+    }
+}
+
+int terraria_seek_next_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
+    if (cursor->rle_offset < cursor->tile.rle) {
+        cursor->rle_offset++;
+        return 1;
+    }
+
+    cursor->file_offset += cursor->tile.size;
+    cursor->rle_offset = 0;
+
+    return read_tile(cursor, error);
 }

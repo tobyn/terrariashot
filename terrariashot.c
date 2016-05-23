@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 #include "world.h"
 
@@ -23,6 +22,14 @@ void die_usage(const char *cmd) {
     exit(EXIT_FAILURE);
 }
 
+unsigned int atoui(const char *a) {
+    int i = atoi(a);
+    if (i < 0)
+        die(_terraria_make_errorf("Invalid unsigned integer: %s", a));
+
+    return (unsigned int) i;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 6 || argc > 7)
         die_usage(argv[0]);
@@ -31,10 +38,10 @@ int main(int argc, char *argv[]) {
 
     int capture_left = atoi(argv[2]);
     int capture_top = atoi(argv[3]);
-    int capture_width = atoi(argv[4]);
-    int capture_height = atoi(argv[5]);
+    unsigned int capture_width = atoui(argv[4]);
+    unsigned int capture_height = atoui(argv[5]);
 
-    int zoom = argc == 7 ? atoi(argv[6]) : 1;
+    unsigned int zoom = argc == 7 ? atoui(argv[6]) : 1;
     if (zoom < 1 || zoom > 5)
         die(_terraria_make_errorf("Invalid zoom level (1 <= %d <= 5)", zoom));
 
@@ -49,8 +56,8 @@ int main(int argc, char *argv[]) {
 
     int max_x = blocks_wide / 2;
     int max_y = blocks_tall / 2;
-    int max_width = max_x - capture_left;
-    int max_height = max_y - capture_top;
+    unsigned int max_width = (unsigned int) max_x - capture_left;
+    unsigned int max_height = (unsigned int) max_y - capture_top;
 
     if (capture_left < -max_x || capture_left >= max_x)
         die(_terraria_make_errorf(
@@ -72,39 +79,33 @@ int main(int argc, char *argv[]) {
                 "Invalid capture area (height = %d < %d < %d)",
                 0, capture_height, max_height));
 
-    int scale = 1 << (5 - zoom);
-    printf("Capturing %dx%d blocks (%d), %dx%d pixels (%d)\n",
-           capture_width, capture_height, capture_width * capture_height,
+    unsigned int scale = (unsigned int) (1 << (5 - zoom));
+    unsigned int capture_size = capture_width * capture_height;
+    printf("Capturing %ux%u blocks (%u), %ux%u pixels (%u)\n",
+           capture_width, capture_height, capture_size,
            capture_width * scale, capture_height * scale,
            capture_width * capture_height * scale);
 
     unsigned int offset = (capture_left * blocks_tall) + capture_top;
-    unsigned int end_offset = (capture_left + capture_width - 1) * blocks_tall +
-                     capture_top + capture_height;
 
     TerrariaTileCursor cursor;
     if (!terraria_seek_tile(world, offset, &cursor, &error))
         die(error);
 
-    int captured = 0;
-    uint8_t *tiles = cursor.tile;
-    uint8_t *tile;
+    unsigned int captured = 0;
     while (1) {
         captured++;
-        tile = cursor.tile;
 
-        offset++;
-
-        if (offset == end_offset)
+        if (captured == capture_size)
             break;
 
         if (!terraria_seek_next_tile(&cursor, &error))
             die(error);
     }
 
-    printf("Read %d tiles (%d * %d)\n", captured, capture_width,
+    printf("Read %u tiles (%u * %u)\n", captured, capture_width,
            capture_height);
-    printf("Total bytes read: %lu\n", tile - tiles);
+    printf("Total bytes read: %u\n", cursor.file_offset + cursor.tile.size);
 
     terraria_close_world(world);
 
