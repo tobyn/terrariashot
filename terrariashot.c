@@ -86,7 +86,9 @@ int main(int argc, char *argv[]) {
            capture_width * scale, capture_height * scale,
            capture_width * capture_height * scale);
 
-    unsigned int offset = (capture_left * blocks_tall) + capture_top;
+    int left_offset = max_x + capture_left;
+    int top_offset = max_y + capture_top;
+    unsigned int offset = (left_offset * blocks_tall) + top_offset;
 
     TerrariaTileCursor cursor;
     if (!terraria_seek_tile(world, offset, &cursor, &error))
