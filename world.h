@@ -15,17 +15,10 @@ typedef struct _TerrariaWorld {
     uint8_t *extra;
 } TerrariaWorld;
 
-
-typedef struct _TerrariaTile {
-    unsigned int size;
-    unsigned int rle;
-} TerrariaTile;
-
-typedef struct _TerrariaTileCursor {
+typedef struct _TerrariaWorldCursor {
     const TerrariaWorld *world;
-    TerrariaTile tile;
-    unsigned int file_offset, rle_offset;
-} TerrariaTileCursor;
+    uint8_t *position;
+} TerrariaWorldCursor;
 
 TerrariaWorld *terraria_open_world(
         const char *world_path,
@@ -38,13 +31,5 @@ int terraria_get_world_size(
         unsigned int *width,
         unsigned int *height,
         TerrariaError **error);
-
-int terraria_seek_tile(
-        const TerrariaWorld *world,
-        const unsigned int tile_offset,
-        TerrariaTileCursor *cursor,
-        TerrariaError **error);
-
-int terraria_seek_next_tile(TerrariaTileCursor *cursor, TerrariaError **error);
 
 #endif // WORLD_H
