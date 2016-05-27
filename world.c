@@ -81,10 +81,10 @@ TerrariaWorld *terraria_open_world(
     }
 
     if (world_version >= 135) {
-        if (!require_bytes(&cursor, 7, error))
+        if (!_terraria_seek_forward(&cursor, 7, error))
             goto clean_up_mmap;
 
-        if (memcmp("relogic", cursor.position, 7) != 0) {
+        if (memcmp("relogic", cursor.position - 7, 7) != 0) {
             *error = _terraria_make_error("Invalid world file (Bad magic)");
             goto clean_up_mmap;
         }

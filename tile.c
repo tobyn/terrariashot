@@ -39,7 +39,7 @@ static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
             return 0;
 
         if (flags1 & 0x20) {
-            printf("    Reading extra\n");
+            printf("    Reading additional type byte\n");
 
             unsigned int more_type;
             if (!_terraria_read_uint8(&world_cursor, &more_type, error))
