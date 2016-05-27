@@ -32,4 +32,36 @@ int terraria_get_world_size(
         unsigned int *height,
         TerrariaError **error);
 
+int _terraria_read_uint8(
+        TerrariaWorldCursor *cursor,
+        unsigned int *out,
+        TerrariaError **error);
+
+int _terraria_read_int16(
+        TerrariaWorldCursor *cursor,
+        int *out,
+        TerrariaError **error);
+
+int _terraria_read_int32(
+        TerrariaWorldCursor *cursor,
+        int *out,
+        TerrariaError **error);
+
+int _terraria_read_string(
+        TerrariaWorldCursor *cursor,
+        unsigned int *length,
+        char **out,
+        TerrariaError **error);
+
+int _terraria_seek_forward(
+        TerrariaWorldCursor *cursor,
+        const unsigned int bytes,
+        TerrariaError **error);
+
+int _terraria_get_section(
+        const TerrariaWorld *world,
+        const unsigned int section_offset,
+        TerrariaWorldCursor *cursor,
+        TerrariaError **error);
+
 #endif // WORLD_H
