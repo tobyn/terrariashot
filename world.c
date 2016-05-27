@@ -132,6 +132,9 @@ TerrariaWorld *terraria_open_world(
     world->extra_count = (unsigned int) signed_count;
     world->extra = cursor.position;
 
+    if (!_terraria_seek_forward(&cursor, world->extra_count, error))
+        goto clean_up_mmap;
+
     return world;
 
     clean_up_mmap:
@@ -283,5 +286,21 @@ int _terraria_get_section(
     cursor->world = world;
     cursor->position = world->start + file_offset;
 
+    return 1;
+}
+
+int _terraria_get_extra(
+        const TerrariaWorld *world,
+        const unsigned int type,
+        unsigned int *extra,
+        TerrariaError **error) {
+    if (type >= world->extra_count) {
+        *error = _terraria_make_errorf(
+                "Requested out of bounds extra (%d >= %d)",
+                type, world->extra_count);
+        return 0;
+    }
+
+    *extra = *(world->extra + type);
     return 1;
 }

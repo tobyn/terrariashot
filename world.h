@@ -64,4 +64,10 @@ int _terraria_get_section(
         TerrariaWorldCursor *cursor,
         TerrariaError **error);
 
+int _terraria_get_extra(
+        const TerrariaWorld *world,
+        const unsigned int type,
+        unsigned int *extra,
+        TerrariaError **error);
+
 #endif // WORLD_H

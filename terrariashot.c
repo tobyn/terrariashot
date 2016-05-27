@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "world.h"
+#include "tile.h"
 
 void die(const char *message) {
     fputs(message, stderr);
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 
     printf("Read %u tiles (%u * %u)\n", captured, capture_width,
            capture_height);
-    printf("Total bytes read: %u\n", cursor.file_offset + cursor.tile.size);
+    printf("Total bytes read: %lu\n", cursor.file_offset + cursor.tile.size);
 
     terraria_close_world(world);
 
