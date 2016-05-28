@@ -7,16 +7,16 @@
 
 typedef struct _TerrariaWorld {
     int fd;
-    size_t file_size;
+    unsigned int file_size;
     uint8_t *start;
     unsigned int section_count;
     int32_t *sections;
     unsigned int tile_extra_count;
-    uint8_t *tile_extra;
+    unsigned int *tile_extra;
 } TerrariaWorld;
 
 typedef struct _TerrariaWorldCursor {
-    const TerrariaWorld *world;
+    TerrariaWorld *world;
     uint8_t *position;
 } TerrariaWorldCursor;
 
@@ -28,7 +28,7 @@ int terraria_open_world(
 void terraria_close_world(TerrariaWorld *world);
 
 int terraria_get_world_size(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         unsigned int *width,
         unsigned int *height,
         TerrariaError **error);
@@ -60,13 +60,13 @@ int _terraria_seek_forward(
         TerrariaError **error);
 
 int _terraria_get_section(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         const unsigned int section_offset,
         TerrariaWorldCursor *cursor,
         TerrariaError **error);
 
 int _terraria_get_extra(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         const unsigned int type,
         unsigned int *extra,
         TerrariaError **error);

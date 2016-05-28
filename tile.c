@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "tile.h"
 
 static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
@@ -18,29 +15,20 @@ static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
     unsigned int flags3 = 0;
 
     if (flags1 & 1) {
-        printf("    Has flags2\n");
-
         if (!_terraria_read_uint8(&world_cursor, &flags2, error))
             return 0;
 
-        if (flags2 & 1) {
-            printf("    Has flags3\n");
-
-            if (!_terraria_read_uint8(&world_cursor, &flags3, error))
-                return 0;
-        }
+        if ((flags2 & 1) &&
+            !_terraria_read_uint8(&world_cursor, &flags3, error))
+            return 0;
     }
 
     if (flags1 & 2) {
-        printf("    Is active!\n");
-
         unsigned int type;
         if (!_terraria_read_uint8(&world_cursor, &type, error))
             return 0;
 
         if (flags1 & 0x20) {
-            printf("    Reading additional type byte\n");
-
             unsigned int more_type;
             if (!_terraria_read_uint8(&world_cursor, &more_type, error))
                 return 0;
@@ -48,57 +36,40 @@ static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
             type |= more_type << 8;
         }
 
-        printf("    Type: %u\n", type);
-
         unsigned int extra;
         if (!_terraria_get_extra(cursor->world, type, &extra, error))
             return 0;
 
-        if (extra) {
-            printf("    Has U/V\n");
+        // U/V
+        if (extra && !_terraria_seek_forward(&world_cursor, 4, error))
+            return 0;
 
-            if (!_terraria_seek_forward(&world_cursor, 4, error))
-                return 0;
-        }
-
-        if (flags3 & 0x8) {
-            printf("    Has color\n");
-
-            if (!_terraria_seek_forward(&world_cursor, 1, error))
-                return 0;
-        }
+        // color
+        if ((flags3 & 0x8) &&
+            !_terraria_seek_forward(&world_cursor, 1, error))
+            return 0;
     }
 
     if (flags1 & 4) {
-        printf("    Is wall\n");
+        // wall
         if (!_terraria_seek_forward(&world_cursor, 1, error))
             return 0;
 
-        if (flags3 & 0x10) {
-            printf("    Has wall color\n");
-
-            if (!_terraria_seek_forward(&world_cursor, 1, error))
-                return 0;
-        }
-    }
-
-    if (flags1 & 0x18) {
-        printf("    Is liquid\n");
-
-        if (!_terraria_seek_forward(&world_cursor, 1, error))
+        // wall color
+        if ((flags3 & 0x10) && !_terraria_seek_forward(&world_cursor, 1, error))
             return 0;
     }
+
+    // liquid
+    if ((flags1 & 0x18) && !_terraria_seek_forward(&world_cursor, 1, error))
+            return 0;
 
     unsigned int rle = 0;
     int rle_format = flags1 >> 6;
     if (rle_format == 1) {
-        printf("    Has 1 byte RLE\n");
-
         if (!_terraria_read_uint8(&world_cursor, &rle, error))
             return 0;
     } else if (rle_format == 2) {
-        printf("    Has 2 byte RLE\n");
-
         int signed_rle;
         if (!_terraria_read_int16(&world_cursor, &signed_rle, error))
             return 0;
@@ -117,7 +88,7 @@ static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
 }
 
 int terraria_seek_tile(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         const unsigned int tile_offset,
         TerrariaTileCursor *cursor,
         TerrariaError **error) {
@@ -125,52 +96,13 @@ int terraria_seek_tile(
     if (!_terraria_get_section(world, 1, &world_cursor, error))
         return 0;
 
-    printf("Tile section offset: %lu\n", world_cursor.position - world->start);
-
     cursor->world = world;
     cursor->file_offset = world_cursor.position - world->start;
 
     unsigned int tile_index = 0;
     while (1) {
-        if (!read_tile(cursor, error)) {
-            printf("Read failed at tile offset %u: %s\n    ", tile_index, *error);
-
-            uint8_t *byte = cursor->world->start + cursor->file_offset;
-            for (unsigned int i = 0; i < cursor->tile.size; i++, byte++) {
-                printf("%d%d%d%d%d%d%d%d ",
-                       (*byte >> 7) & 1,
-                       (*byte >> 6) & 1,
-                       (*byte >> 5) & 1,
-                       (*byte >> 4) & 1,
-                       (*byte >> 3) & 1,
-                       (*byte >> 2) & 1,
-                       (*byte >> 1) & 1,
-                       *byte & 1);
-            }
-            puts("");
-
+        if (!read_tile(cursor, error))
             return 0;
-        }
-
-        printf("Tile %u at offset %lu (%u bytes, RLE %u)\n    ", tile_index,
-               cursor->file_offset, cursor->tile.size, cursor->tile.rle);
-
-        uint8_t *byte = cursor->world->start + cursor->file_offset;
-        for (unsigned int i = 0; i < cursor->tile.size; i++, byte++) {
-            printf("%d%d%d%d%d%d%d%d ",
-                   (*byte >> 7) & 1,
-                   (*byte >> 6) & 1,
-                   (*byte >> 5) & 1,
-                   (*byte >> 4) & 1,
-                   (*byte >> 3) & 1,
-                   (*byte >> 2) & 1,
-                   (*byte >> 1) & 1,
-                   *byte & 1);
-        }
-        puts("");
-
-        if (tile_index >= 200)
-            exit(0);
 
         unsigned int last_index = tile_index + cursor->tile.rle;
         if (last_index >= tile_offset) {

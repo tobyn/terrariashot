@@ -1,5 +1,5 @@
 #!/bin/bash
 
 for world in test-worlds/*.wld; do
-  time ./terrariashot "$world" -1000 -100 2000 200
+  time ./build/terrariashot "$world" -1000 -100 2000 200
 done

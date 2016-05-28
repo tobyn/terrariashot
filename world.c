@@ -29,6 +29,49 @@ static int require_bytes(
 }
 
 
+static int read_extra(
+        TerrariaWorldCursor *cursor,
+        TerrariaError **error) {
+    int signed_count;
+    if (!_terraria_read_int16(cursor, &signed_count, error))
+        return 0;
+
+    if (signed_count < 1) {
+        *error = _terraria_make_error("Invalid world file (Bad extra list)");
+        return 0;
+    }
+
+    unsigned int extra_count = (unsigned int) signed_count;
+    unsigned int *extra = malloc(extra_count * sizeof(unsigned int));
+
+    if (extra == NULL) {
+        *error = _terraria_make_error("Couldn't allocate tile extra list");
+        return 0;
+    }
+
+    unsigned int bits = 0;
+    int mask = 0x80;
+    for (int i = 0; i < signed_count; i++) {
+        if (mask == 0x80) {
+            mask = 1;
+            if (!_terraria_read_uint8(cursor, &bits, error)) {
+                free(extra);
+                return 0;
+            }
+        } else {
+            mask <<= 1;
+        }
+
+        extra[i] = bits & mask;
+    }
+
+    cursor->world->tile_extra_count = extra_count;
+    cursor->world->tile_extra = extra;
+
+    return 1;
+}
+
+
 int terraria_open_world(
         const char *world_path,
         TerrariaWorld *world,
@@ -45,7 +88,7 @@ int terraria_open_world(
         goto error_after_open;
     }
 
-    world->file_size = (size_t) world_file_stats.st_size;
+    world->file_size = (unsigned int) world_file_stats.st_size;
 
     world->start = mmap(NULL, world->file_size, PROT_READ, MAP_SHARED,
                         world->fd, 0);
@@ -110,19 +153,10 @@ int terraria_open_world(
     world->section_count = (unsigned int) signed_count;
     world->sections = (int32_t *) cursor.position;
 
-    if (!_terraria_seek_forward(&cursor, 4 * world->section_count, error) ||
-        !_terraria_read_int16(&cursor, &signed_count, error))
+    if (!_terraria_seek_forward(&cursor, 4 * world->section_count, error))
         goto error_after_mmap;
 
-    if (signed_count < 1) {
-        *error = _terraria_make_error("Invalid world file (Bad extra list)");
-        goto error_after_mmap;
-    }
-
-    world->tile_extra_count = (unsigned int) signed_count;
-    world->tile_extra = cursor.position;
-
-    if (!require_bytes(&cursor, world->tile_extra_count, error))
+    if (!read_extra(&cursor, error))
         goto error_after_mmap;
 
     return 1;
@@ -137,13 +171,14 @@ int terraria_open_world(
 }
 
 void terraria_close_world(TerrariaWorld *world) {
+    free(world->tile_extra);
     munmap(world, world->file_size);
     close(world->fd);
 }
 
 
 int terraria_get_world_size(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         unsigned int *width,
         unsigned int *height,
         TerrariaError **error) {
@@ -248,7 +283,7 @@ int _terraria_seek_forward(
 
 
 int _terraria_get_section(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         const unsigned int section_offset,
         TerrariaWorldCursor *cursor,
         TerrariaError **error) {
@@ -274,7 +309,7 @@ int _terraria_get_section(
 }
 
 int _terraria_get_extra(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         const unsigned int type,
         unsigned int *extra,
         TerrariaError **error) {

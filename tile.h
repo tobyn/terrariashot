@@ -9,7 +9,7 @@ typedef struct _TerrariaTile {
 } TerrariaTile;
 
 typedef struct _TerrariaTileCursor {
-    const TerrariaWorld *world;
+    TerrariaWorld *world;
     TerrariaTile tile;
     unsigned long file_offset;
     unsigned int rle_offset;
@@ -17,7 +17,7 @@ typedef struct _TerrariaTileCursor {
 
 
 int terraria_seek_tile(
-        const TerrariaWorld *world,
+        TerrariaWorld *world,
         const unsigned int tile_offset,
         TerrariaTileCursor *cursor,
         TerrariaError **error);
