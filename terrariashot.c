@@ -46,12 +46,12 @@ int main(int argc, char *argv[]) {
         die(_terraria_make_errorf("Invalid zoom level (1 <= %d <= 5)", zoom));
 
     TerrariaError *error = NULL;
-    TerrariaWorld *world = terraria_open_world(world_path, &error);
-    if (world == NULL)
+    TerrariaWorld world;
+    if (!terraria_open_world(world_path, &world, &error))
         die(error);
 
     unsigned int blocks_wide, blocks_tall;
-    if (!terraria_get_world_size(world, &blocks_wide, &blocks_tall, &error))
+    if (!terraria_get_world_size(&world, &blocks_wide, &blocks_tall, &error))
         die(error);
 
     int max_x = blocks_wide / 2;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     unsigned int offset = (left_offset * blocks_tall) + top_offset;
 
     TerrariaTileCursor cursor;
-    if (!terraria_seek_tile(world, offset, &cursor, &error))
+    if (!terraria_seek_tile(&world, offset, &cursor, &error))
         die(error);
 
     unsigned int captured = 0;
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
            capture_height);
     printf("Total bytes read: %lu\n", cursor.file_offset + cursor.tile.size);
 
-    terraria_close_world(world);
+    terraria_close_world(&world);
 
     return EXIT_SUCCESS;
 }

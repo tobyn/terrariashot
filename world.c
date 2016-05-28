@@ -29,19 +29,14 @@ static int require_bytes(
 }
 
 
-TerrariaWorld *terraria_open_world(
+int terraria_open_world(
         const char *world_path,
+        TerrariaWorld *world,
         TerrariaError **error) {
-    TerrariaWorld *world = malloc(sizeof(TerrariaWorld));
-    if (world == NULL) {
-        *error = MALLOC_FAILED;
-        return NULL;
-    }
-
     world->fd = open(world_path, O_RDONLY);
     if (world->fd == -1) {
         *error = _terraria_make_perror("Couldn't open world file");
-        goto clean_up_malloc;
+        return 0;
     }
 
     struct stat world_file_stats;
@@ -132,10 +127,10 @@ TerrariaWorld *terraria_open_world(
     world->extra_count = (unsigned int) signed_count;
     world->extra = cursor.position;
 
-    if (!_terraria_seek_forward(&cursor, world->extra_count, error))
+    if (!require_bytes(&cursor, world->extra_count, error))
         goto clean_up_mmap;
 
-    return world;
+    return 1;
 
     clean_up_mmap:
     munmap(world, world->file_size);
@@ -143,10 +138,7 @@ TerrariaWorld *terraria_open_world(
     clean_up_open:
     close(world->fd);
 
-    clean_up_malloc:
-    free(world);
-
-    return NULL;
+    return 0;
 }
 
 void terraria_close_world(TerrariaWorld *world) {

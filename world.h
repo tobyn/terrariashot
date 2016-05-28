@@ -20,8 +20,9 @@ typedef struct _TerrariaWorldCursor {
     uint8_t *position;
 } TerrariaWorldCursor;
 
-TerrariaWorld *terraria_open_world(
+int terraria_open_world(
         const char *world_path,
+        TerrariaWorld *world,
         TerrariaError **error);
 
 void terraria_close_world(TerrariaWorld *world);

@@ -31,7 +31,7 @@ static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
         }
     }
 
-    if ((flags1 >> 1) & 1) {
+    if (flags1 & 2) {
         printf("    Is active!\n");
 
         unsigned int type;
@@ -45,7 +45,7 @@ static int read_tile(TerrariaTileCursor *cursor, TerrariaError **error) {
             if (!_terraria_read_uint8(&world_cursor, &more_type, error))
                 return 0;
 
-            type = (type << 8) | more_type;
+            type |= more_type << 8;
         }
 
         printf("    Type: %u\n", type);
