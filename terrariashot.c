@@ -54,6 +54,8 @@ int main(int argc, char *argv[]) {
     if (!terraria_get_world_size(&world, &blocks_wide, &blocks_tall, &error))
         die(error);
 
+    printf("World size: %ux%u\n", blocks_wide, blocks_tall);
+
     int max_x = blocks_wide / 2;
     int max_y = blocks_tall / 2;
     unsigned int max_width = (unsigned int) max_x - capture_left;

@@ -125,6 +125,8 @@ int terraria_seek_tile(
     if (!_terraria_get_section(world, 1, &world_cursor, error))
         return 0;
 
+    printf("Tile section offset: %lu\n", world_cursor.position - world->start);
+
     cursor->world = world;
     cursor->file_offset = world_cursor.position - world->start;
 

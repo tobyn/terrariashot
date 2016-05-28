@@ -42,7 +42,7 @@ int terraria_open_world(
     struct stat world_file_stats;
     if (fstat(world->fd, &world_file_stats) == -1) {
         *error = _terraria_make_perror("Couldn't read world file metadata");
-        goto clean_up_open;
+        goto error_after_open;
     }
 
     world->file_size = (size_t) world_file_stats.st_size;
@@ -51,7 +51,7 @@ int terraria_open_world(
                         world->fd, 0);
     if (world->start == MAP_FAILED) {
         *error = _terraria_make_perror("Failed to mmap world file");
-        goto clean_up_open;
+        goto error_after_open;
     }
 
     TerrariaWorldCursor cursor;
@@ -60,82 +60,77 @@ int terraria_open_world(
 
     int world_version;
     if (!_terraria_read_int32(&cursor, &world_version, error))
-        goto clean_up_mmap;
+        goto error_after_mmap;
 
     if (world_version < MIN_SUPPORTED_WORLD_VERSION) {
         *error = _terraria_make_errorf(
                 "World too old (version %d < %d)",
                 world_version, MIN_SUPPORTED_WORLD_VERSION);
-        goto clean_up_mmap;
+        goto error_after_mmap;
     }
     if (world_version > MAX_SUPPORTED_WORLD_VERSION) {
         *error = _terraria_make_errorf(
                 "World too new (version %d > %d)",
                 world_version, MAX_SUPPORTED_WORLD_VERSION);
-        goto clean_up_mmap;
+        goto error_after_mmap;
     }
 
     if (world_version >= 135) {
         if (!_terraria_seek_forward(&cursor, 7, error))
-            goto clean_up_mmap;
+            goto error_after_mmap;
 
         if (memcmp("relogic", cursor.position - 7, 7) != 0) {
             *error = _terraria_make_error("Invalid world file (Bad magic)");
-            goto clean_up_mmap;
+            goto error_after_mmap;
         }
 
         unsigned int file_type;
         if (!_terraria_read_uint8(&cursor, &file_type, error))
-            goto clean_up_mmap;
+            goto error_after_mmap;
 
         if (file_type != 2) {
             *error = _terraria_make_errorf("Not a world file (File type %u)",
                                            file_type);
-            goto clean_up_mmap;
+            goto error_after_mmap;
         }
 
-        if (!_terraria_seek_forward(&cursor, 8, error))
-            goto clean_up_mmap;
+        if (!_terraria_seek_forward(&cursor, 12, error))
+            goto error_after_mmap;
     }
-
-    if (!_terraria_seek_forward(&cursor, 16, error))
-        goto clean_up_mmap;
 
     int signed_count;
     if (!_terraria_read_int16(&cursor, &signed_count, error))
-        goto clean_up_mmap;
+        goto error_after_mmap;
 
     if (signed_count < 1) {
         *error = _terraria_make_error("Invalid world file (Bad section list)");
-        goto clean_up_mmap;
+        goto error_after_mmap;
     }
 
     world->section_count = (unsigned int) signed_count;
     world->sections = (int32_t *) cursor.position;
 
-    if (!_terraria_seek_forward(&cursor, 4 * world->section_count, error))
-        goto clean_up_mmap;
-
-    if (!_terraria_read_int16(&cursor, &signed_count, error))
-        goto clean_up_mmap;
+    if (!_terraria_seek_forward(&cursor, 4 * world->section_count, error) ||
+        !_terraria_read_int16(&cursor, &signed_count, error))
+        goto error_after_mmap;
 
     if (signed_count < 1) {
         *error = _terraria_make_error("Invalid world file (Bad extra list)");
-        goto clean_up_mmap;
+        goto error_after_mmap;
     }
 
-    world->extra_count = (unsigned int) signed_count;
-    world->extra = cursor.position;
+    world->tile_extra_count = (unsigned int) signed_count;
+    world->tile_extra = cursor.position;
 
-    if (!require_bytes(&cursor, world->extra_count, error))
-        goto clean_up_mmap;
+    if (!require_bytes(&cursor, world->tile_extra_count, error))
+        goto error_after_mmap;
 
     return 1;
 
-    clean_up_mmap:
+    error_after_mmap:
     munmap(world, world->file_size);
 
-    clean_up_open:
+    error_after_open:
     close(world->fd);
 
     return 0;
@@ -161,25 +156,22 @@ int terraria_get_world_size(
     if (!_terraria_read_string(&cursor, &title_length, &title, error))
         return 0;
 
-    if (!_terraria_seek_forward(&cursor, 21, error))
+    if (!_terraria_seek_forward(&cursor, 20, error))
         return 0;
 
-    int signed_width;
-    if (!_terraria_read_int32(&cursor, &signed_width, error))
+    int signed_height, signed_width;
+    if (!_terraria_read_int32(&cursor, &signed_height, error) ||
+        !_terraria_read_int32(&cursor, &signed_width, error))
         return 0;
 
     if (signed_width <= 0) {
-        *error = _terraria_make_errorf("Invalid world height (%d)",
+        *error = _terraria_make_errorf("Invalid world width (%d)",
                                        signed_width);
         return 0;
     }
 
-    int signed_height;
-    if (!_terraria_read_int32(&cursor, &signed_height, error))
-        return 0;
-
     if (signed_height < 0) {
-        *error = _terraria_make_errorf("Invalid world width (%d)",
+        *error = _terraria_make_errorf("Invalid world height (%d)",
                                        signed_height);
         return 0;
     }
@@ -286,13 +278,13 @@ int _terraria_get_extra(
         const unsigned int type,
         unsigned int *extra,
         TerrariaError **error) {
-    if (type >= world->extra_count) {
+    if (type >= world->tile_extra_count) {
         *error = _terraria_make_errorf(
                 "Requested out of bounds extra (%d >= %d)",
-                type, world->extra_count);
+                type, world->tile_extra_count);
         return 0;
     }
 
-    *extra = *(world->extra + type);
+    *extra = *(world->tile_extra + type);
     return 1;
 }

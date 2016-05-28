@@ -11,8 +11,8 @@ typedef struct _TerrariaWorld {
     uint8_t *start;
     unsigned int section_count;
     int32_t *sections;
-    unsigned int extra_count;
-    uint8_t *extra;
+    unsigned int tile_extra_count;
+    uint8_t *tile_extra;
 } TerrariaWorld;
 
 typedef struct _TerrariaWorldCursor {
