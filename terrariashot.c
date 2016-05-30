@@ -1,11 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include "tile.h"
 
 void die(const char *message) {
     fputs(message, stderr);
     fputs("\n", stderr);
+    exit(EXIT_FAILURE);
+}
+
+void dief(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    vfprintf(stderr, format, args);
+    fputs("\n", stderr);
+
+    va_end(args);
+
     exit(EXIT_FAILURE);
 }
 
@@ -25,7 +38,7 @@ void die_usage(const char *cmd) {
 unsigned int atoui(const char *a) {
     int i = atoi(a);
     if (i < 0)
-        die(_terraria_make_errorf("Invalid unsigned integer: %s", a));
+        dief("Invalid unsigned integer: %s", a);
 
     return (unsigned int) i;
 }
@@ -43,7 +56,7 @@ int main(int argc, char *argv[]) {
 
     unsigned int zoom = argc == 7 ? atoui(argv[6]) : 1;
     if (zoom < 1 || zoom > 5)
-        die(_terraria_make_errorf("Invalid zoom level (1 <= %d <= 5)", zoom));
+        dief("Invalid zoom level (1 <= %d <= 5)", zoom);
 
     TerrariaError *error = NULL;
     TerrariaWorld world;
@@ -62,24 +75,16 @@ int main(int argc, char *argv[]) {
     unsigned int max_height = (unsigned int) max_y - capture_top;
 
     if (capture_left < -max_x || capture_left >= max_x)
-        die(_terraria_make_errorf(
-                "Invalid capture area (left = %d <= %d < %d)",
-                -max_x, capture_left, max_x));
+        die("Invalid left capture edge");
 
     if (capture_width < 1 || capture_width > max_width)
-        die(_terraria_make_errorf(
-                "Invalid capture area (width = %d < %d < %d)",
-                0, capture_width, max_width));
+        die("Invalid capture width");
 
     if (capture_top < -max_y || capture_top >= max_y)
-        die(_terraria_make_errorf(
-                "Invalid capture area (top = %d <= %d < %d)",
-                -max_y, capture_top, max_y));
+        die("Invalid top capture edge");
 
     if (capture_height < 1 || capture_height > max_height)
-        die(_terraria_make_errorf(
-                "Invalid capture area (height = %d < %d < %d)",
-                0, capture_height, max_height));
+        die("Invalid capture height");
 
     unsigned int scale = (unsigned int) (1 << (5 - zoom));
     unsigned int capture_size = capture_width * capture_height;
